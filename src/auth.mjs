@@ -64,6 +64,70 @@ function signInResult(tokens, identity, loginMethod, now, expectedEmail) {
   }
 }
 
+async function startGoogleSignIn(api, identity, oauthAttemptId, signal) {
+  // The attempt ID goes to Aside; its separate opaque ticket stays with this authorization.
+  const started = await api.json("/auth/oauth/google/start", {
+    method: "POST",
+    signal,
+    body: { accountId: identity.asideAccountId, oauthAttemptId },
+  })
+  if (!record(started) || !nonempty(started.oauthAttemptToken) || typeof started.url !== "string") {
+    throw invalidResponse()
+  }
+  let url
+  try { url = new URL(started.url) } catch { throw invalidResponse() }
+  if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw invalidResponse()
+  url.searchParams.set("prompt", "select_account")
+  return { url: url.toString(), oauthAttemptToken: started.oauthAttemptToken }
+}
+
+function exchangeGoogleToken(api, identity, oauthAttemptToken, supabaseAccessToken, signal) {
+  return api.json("/auth/token/exchange", {
+    method: "POST",
+    signal,
+    body: {
+      authProtocol: 2,
+      accountId: identity.asideAccountId,
+      supabaseAccessToken,
+      device: identity.asideDevice,
+      oauthAttemptToken,
+    },
+  })
+}
+
+function pastedGoogleAccessToken(value, origin, identity, oauthAttemptId) {
+  let url
+  try {
+    if (!nonempty(value)) throw new Error()
+    url = new URL(value.trim())
+  } catch {
+    throw new Error("Paste the full Aside callback URL, including its #access_token fragment.")
+  }
+  if (url.origin !== origin || url.pathname !== "/auth/callback" || url.username || url.password) {
+    throw new Error("The Google callback URL must use this Aside API origin and the /auth/callback path, without URL credentials.")
+  }
+  const accounts = url.searchParams.getAll("accountId")
+  const attempts = url.searchParams.getAll("oauthAttemptId")
+  if (accounts.length !== 1 || accounts[0] !== String(identity.asideAccountId) ||
+      attempts.length !== 1 || attempts[0] !== oauthAttemptId) {
+    throw new Error("The callback URL must contain one matching accountId and oauthAttemptId. Start Google sign-in again.")
+  }
+  const fragment = new URLSearchParams(url.hash.slice(1).replace(/^\?/, ""))
+  if (url.searchParams.has("flow") || fragment.has("flow") ||
+      url.searchParams.getAll("type").some((type) => type.toLowerCase() === "recovery") ||
+      fragment.getAll("type").some((type) => type.toLowerCase() === "recovery")) {
+    throw new Error("Password recovery links cannot complete Google sign-in. Start Google sign-in again.")
+  }
+  if (fragment.has("error") || fragment.has("error_code") || fragment.has("error_description")) {
+    throw new Error("Google sign-in was not completed. Start again.")
+  }
+  const tokens = fragment.getAll("access_token")
+  if (tokens.length !== 1 || !nonempty(tokens[0])) {
+    throw new Error("Paste the full callback URL with exactly one nonempty access_token in its fragment, not an authorization code.")
+  }
+  return tokens[0]
+}
+
 export function isAllowedCallbackOrigin(origin) {
   if (ASIDE_ORIGINS.has(origin)) return true
   try {
@@ -284,17 +348,9 @@ export async function createGoogleCallbackReceiver({
     // Header/body deadlines must not cut off a valid exchange while the API is responding.
     request.socket.setTimeout(0)
     try {
-      const tokens = await api.json("/auth/token/exchange", {
-        method: "POST",
-        signal: abort.signal,
-        body: {
-          authProtocol: 2,
-          accountId: credential.asideAccountId,
-          supabaseAccessToken: body.supabaseAccessToken,
-          device: credential.asideDevice,
-          oauthAttemptToken,
-        },
-      })
+      const tokens = await exchangeGoogleToken(
+        api, credential, oauthAttemptToken, body.supabaseAccessToken, abort.signal,
+      )
       if (phase === "terminal") return
       const completed = signInResult(tokens, credential, "google", api.now)
       // Mirror Aside's token-free local callback response, not its remote token payload.
@@ -436,23 +492,12 @@ export function createAuthMethods({
           api, identity, oauthAttemptId, port: callbackPort, timeoutMs: callbackTimeoutMs,
         })
         try {
-          // The attempt ID is supplied to the server, while its separate opaque token stays local.
-          let started = await api.json("/auth/oauth/google/start", {
-            method: "POST",
-            signal: receiver.signal,
-            body: { accountId: identity.asideAccountId, oauthAttemptId },
-          })
-          if (!record(started) || !nonempty(started.oauthAttemptToken) || typeof started.url !== "string") {
-            throw invalidResponse()
-          }
-          let url
-          try { url = new URL(started.url) } catch { throw invalidResponse() }
-          if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) throw invalidResponse()
-          url.searchParams.set("prompt", "select_account")
+          let started = await startGoogleSignIn(api, identity, oauthAttemptId, receiver.signal)
+          const url = started.url
           receiver.activate(started.oauthAttemptToken)
           started = undefined
           return {
-            url: url.toString(),
+            url,
             method: "auto",
             instructions: "Complete Google sign-in in your browser. Allow local network access if Aside asks, then return to Magpie. " +
               "Google sign-in expires after ten minutes; the hosted Aside callback connects to 127.0.0.1:21420.",
@@ -461,6 +506,64 @@ export function createAuthMethods({
         } catch (error) {
           await receiver.close(error)
           throw error
+        }
+      },
+    },
+    {
+      type: "oauth",
+      label: "Sign in with Google (paste callback URL)",
+      async authorize() {
+        const origin = new URL(api.baseURL).origin
+        let identity = await createIdentity()
+        const oauthAttemptId = randomUUID()
+        const expiresAt = api.now() + GOOGLE_OAUTH_TTL_MS
+        let started
+        try {
+          started = await startGoogleSignIn(api, identity, oauthAttemptId)
+        } catch {
+          identity = undefined
+          // Server/transport error messages may contain transient OAuth secrets.
+          throw new Error("Google sign-in could not be started. Start again.")
+        }
+        const url = started.url
+        let oauthAttemptToken = started.oauthAttemptToken
+        started = undefined
+        let completion
+        return {
+          url,
+          method: "code",
+          instructions: "Complete Google sign-in in your browser. The Aside callback immediately clears its URL. " +
+            "Before signing in, enable Preserve log in browser DevTools Network, then copy the final Supabase redirect response's Location header, not the request URL. " +
+            "Alternatively, disable JavaScript only for the Aside callback origin before signing in and copy the full address. " +
+            "Paste the full callback URL, including accountId, oauthAttemptId and #access_token. Treat it like a password and do not share it. " +
+            "This attempt expires after ten minutes and does not use a local callback port.",
+          callback(fullURL) {
+            if (completion) return completion
+            // Install the single-flight promise before validation or an exchange can run.
+            completion = Promise.resolve().then(async () => {
+              let supabaseAccessToken
+              try {
+                if (api.now() >= expiresAt) throw new Error(EXPIRED_ATTEMPT)
+                supabaseAccessToken = pastedGoogleAccessToken(fullURL, origin, identity, oauthAttemptId)
+                fullURL = undefined
+                let tokens
+                try {
+                  tokens = await exchangeGoogleToken(api, identity, oauthAttemptToken, supabaseAccessToken)
+                } catch {
+                  throw new Error("Google sign-in could not be completed. Start again.")
+                }
+                return signInResult(tokens, identity, "google", api.now)
+              } catch (error) {
+                return failure(error)
+              } finally {
+                fullURL = undefined
+                supabaseAccessToken = undefined
+                oauthAttemptToken = undefined
+                identity = undefined
+              }
+            })
+            return completion
+          },
         }
       },
     },

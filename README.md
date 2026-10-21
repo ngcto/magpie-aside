@@ -1,6 +1,6 @@
 # magpie-aside
 
-Unofficial [Magpie provider plugin](https://usemagpie.ai/docs/plugins) for Aside's language and image-generation models. Email-code and Google sign-in; source-derived request headers; isolated credentials/devices; on-demand token renewal. No runtime dependencies beyond Magpie's Bun host.
+[Magpie provider plugin](https://usemagpie.ai/docs/plugins) for Aside's language and image-generation models. Email-code and Google sign-in, including paste-URL sign-in for remote hosts; source-derived request headers; isolated credentials/devices; on-demand token renewal. No runtime dependencies beyond Magpie's Bun host.
 
 ## Install
 
@@ -15,14 +15,28 @@ magpie provider models aside
 
 The package/plugin name is **`magpie-aside`**. The provider ID is **`aside`**; clients select `aside/<model-id>`. Choose current IDs from Magpie's model list rather than a fixed list in this README.
 
+Both plugin and provider metadata use Aside's HTTPS icon URL: https://aside.com/icon.png.
+
 This checkout is loaded in place. After editing it, restart Magpie's plugin host (disable/re-enable the plugin in the app, or start a new CLI command).
 
 ## Sign-in
 
 - **Email code:** enter your email, then the six-digit verification code. Use the code, not the emailed link. No password or dummy API key is required.
-- **Google:** complete the server-issued Google/Supabase flow in your browser. Aside's hosted page calls the plugin's receiver on **`127.0.0.1:21420`**. Allow the browser's local-network permission if prompted. Quit Aside or another process occupying that port before starting Google sign-in. The attempt expires after ten minutes; the listener closes after completion, failure, or expiry.
+- **Google (local callback):** complete the server-issued Google/Supabase flow in your browser. Aside's hosted page calls the plugin's receiver on **`127.0.0.1:21420`**. Allow the browser's local-network permission if prompted. Quit Aside or another process occupying that port before using this method. The attempt expires after ten minutes; the listener closes after completion, failure, or expiry.
+- **Google (paste callback URL):** choose this option when Magpie runs remotely or on a hosted server. It uses no local callback listener and also expires after ten minutes.
 
-Magpie stores each account in its `plugin-auth.json` (mode `0600` on POSIX). The saved record contains access/refresh tokens, expiry, account identity, the credential's device registration, and its last known plan. OTPs, Supabase callback tokens, and opaque OAuth attempt tickets are not saved.
+### Google on remote or hosted Magpie
+
+1. Choose **Sign in with Google (paste callback URL)**.
+2. Open browser DevTools on your own machine and enable **Network → Preserve log** before following the authorization URL.
+3. Complete Google sign-in. Copy the final Supabase redirect response's **`Location` header** pointing at Aside's `/auth/callback`, not the HTTP request URL.
+4. Paste that **complete URL** into Magpie. It must include the `accountId` and `oauthAttemptId` query parameters and the `#access_token=…` fragment.
+
+Aside's callback page immediately clears its query and fragment, so copying the address after the page loads will not work. The HTTP request URL also omits the fragment. Alternatively, disable JavaScript **only for the Aside callback origin** before signing in, keep it enabled for Google/Supabase, and copy the full callback address. If the URL is incomplete or the attempt expires, start a new sign-in.
+
+**Treat the callback URL like a password. Do not share or store it.**
+
+Magpie stores each account in its `plugin-auth.json` (mode `0600` on POSIX). The saved record contains access/refresh tokens, expiry, account identity, the credential's device registration, and its last known plan. OTPs, callback URLs, Supabase callback tokens, and opaque OAuth attempt tickets are not saved.
 
 Each sign-in gets a new credential UUID and a fresh **P-256** software-installation public key. Device registration uses Aside's `p256_v1` format: an uncompressed 65-byte public key, its P-256 JWK, and `sha256:<hex>` over those raw public-key bytes. Only public registration data is retained; no native Aside keys or credentials are imported. The supplied client's macOS registration format is used on non-Windows hosts; Windows uses its Windows registration value. Conversations are namespaced by credential so accounts do not share upstream session/cache identities.
 
@@ -63,9 +77,9 @@ Aside exposes no size, quality, background, output-format, or mask controls in t
 bun test
 ```
 
-98 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, OAuth callback boundaries, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
+107 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, OAuth origin/state/token/expiry boundaries, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
 
-Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and Google CLI sign-in, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, and lazy forced renewal. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, device acceptance, and token refresh were not exercised against a live Aside account.**
+Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and both Google CLI sign-in modes, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, and lazy forced renewal. Paste-URL sign-in completed with the callback port occupied and no loopback callback request. Aside's icon was observed in Magpie's light and dark plugin lists. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, device acceptance, and token refresh were not exercised against a live Aside account.**
 
 ## Source provenance
 

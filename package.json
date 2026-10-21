@@ -1,6 +1,6 @@
 {
   "name": "magpie-aside",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Aside provider for Magpie: email and Google sign-in, language models, and image generation",
   "type": "module",
   "main": "./index.mjs",
@@ -8,5 +8,6 @@
   "files": ["index.mjs", "src", "README.md", "CHANGELOG.md", "LICENSE"],
   "keywords": ["opencode", "opencode-plugin", "magpie", "aside", "auth", "provider"],
   "license": "MIT",
+  "magpie": { "icon": "https://aside.com/icon.png" },
   "scripts": { "test": "bun test" }
 }

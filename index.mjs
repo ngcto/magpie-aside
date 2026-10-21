@@ -129,6 +129,7 @@ export const MagpieAsidePlugin = async ({ client }, options = {}) => {
     },
     auth: {
       provider: "aside",
+      icon: "https://aside.com/icon.png",
       methods,
       // Deliberately no auth.refresh: the host's lead/loader renewal is not Aside's lazy check.
       loader: async (getAuth) => {
