@@ -43,6 +43,7 @@ There are no configured build, lint, formatter, or standalone run commands. Afte
 - Do not add `auth.refresh`, startup renewal, or periodic refresh timers. Authenticated requests renew near expiry or replay once for recognized access-token 401 codes; other 401s are not blindly retried.
 - Use `AsideApiError` status/code/details; terminal authentication failures use `signIn: "expired"`. Preserve cancellation reasons. A cancelled waiter must not abort another caller's shared renewal/discovery.
 - Request preparation mutates bodies: retain structured-output constraints and original Fast intent across replay. Preserve native header allowlists and device wire fields, including intentional `macos` registration on non-Windows hosts.
+- Hosted web search is declared with provider `searches: true`, preserving an explicit user opt-out. Native Responses tool declarations and filters pass through. Read `magpie.option("aside", key)` live for the `web_search` and `x_search` switches; optional injection is limited to automatic GPT/Grok Responses tool use, never explicit tool restrictions or another model family.
 - Images use byte-derived PNG/JPEG/WebP MIME validation. Do not fetch remote references, invent unsupported controls, or retry billable generations transiently.
 
 ## Important Files
@@ -58,6 +59,8 @@ There are no configured build, lint, formatter, or standalone run commands. Afte
 Use Bun for tests and local probes; Magpie runs the plugin in its Bun host. Tests require `bun:test` and `Bun.serve`; production also uses Node built-ins and modern Fetch/Abort/WebCrypto APIs. No dependencies, lockfile, package-manager pin, or minimum runtime version is declared. Source is packaged directly without transpilation.
 
 API origin precedence is `options.apiBaseUrl` → `ASIDE_API_URL` → Aside's default API. Use a loopback origin for isolated QA. Base URLs cannot contain credentials/query/fragment, and requests cannot leave their configured origin or follow redirects.
+
+Hosted-search switches are in **Providers → Aside → Plugin options**: **Native web search** for GPT/Grok and **Native X search** for Grok. Both default off because hosted searches may consume allowance. Clients that declare hosted tools explicitly do not need these switches. Bare requests need `tool_choice: "auto"` to opt into injection; existing function-tool turns can omit it. Do not enable searches on background requests or restore filtered tools lost by cross-protocol translation with invented filters.
 
 ## Testing & QA
 

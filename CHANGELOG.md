@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 — 2026-10-21
+
+- Declare native hosted search so GPT/Grok Responses requests retain web/X search tools instead of being rewritten as generic search.
+- Add off-by-default Native web search and Native X search switches in Aside's provider editor for clients using ordinary function tools or translated APIs.
+- Keep explicit tool restrictions, existing search filters, and user-configured native-search opt-outs; do not inject X search into GPT or Chat models.
+- Cover live opt-in changes, billing boundaries, and duplicate hosted-tool prevention.
+
 ## 0.1.3 — 2026-10-21
 
 - Remove the third Google paste-callback sign-in method and its parser, tests, and current instructions.
