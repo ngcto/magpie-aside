@@ -56,6 +56,24 @@ There is no `auth.refresh` hook, periodic renewal, or startup token-refresh time
 
 Renewal is single-flight per credential and preserves the same device registration. It mirrors the app's three attempts, transient delays, forced-renewal reuse window, and on-demand cooldown. Removed or replaced credentials are not overwritten by an old renewal. LLM deadlines end when response headers arrive; caller cancellation remains active throughout the stream. Image generation retains its separate full-operation deadline.
 
+## Usage and allowances
+
+The `auth.usage` hook reads Aside's authenticated **`GET /billing/subscription`**. Magpie shows the result in **Usage → Overview**, on the account in Providers, and through its quota API:
+
+```sh
+magpie quota aside --json
+magpie quota refresh aside --json
+```
+
+The gateway also exposes it at `GET /v1/magpie/quotas`. The card shows the active plan, renewal/end date, reported monthly usage percentage and credit refresh, balance, monthly allowance, and separate add-on credits. Credit counts use Aside's own USD-cent-equivalent display convention, rounded using the server's conversion scale with exact integer arithmetic.
+
+Returned wallets are not summed, and rounded percentages are not converted into a fabricated spent count. The meter is informational: a monthly allowance reaching 100% does not disable the account or prevent add-on spending; Aside still admits or rejects each generation request.
+
+Allowance reads use the existing demand-driven token renewal and keep each credential isolated. Billing failures remain errors rather than an invented zero-use allowance. No background refresh timer or billing-plan write is added.
+
+**Stock Magpie limits:** Aside remains under **From plugins**, not the host's hardcoded Subscriptions list. The existing automatic and paste-URL Google methods remain separate; the host's native inline callback fallback cannot pass Aside's HTTPS token fragment to a plugin. No Magpie host patch is applied.
+
+
 ## Images
 
 Use Magpie's standard endpoints with an explicit `aside/<image-model-id>`:
@@ -69,7 +87,7 @@ The plugin maps both to Aside's single JSON `/ai/images/generations` request. Su
 
 Aside exposes no size, quality, background, output-format, or mask controls in this API. Explicit unsupported controls are rejected; `auto` values are accepted where applicable. The plugin does not download remote reference URLs. Chat-based drawing is supported without streaming; use the Images endpoints for image generation.
 
-**Magpie limits:** arbitrary plugin subscriptions are currently absent from its automatic image-provider picker; explicit provider/model requests work. Its dedicated Images endpoints return completed JSON rather than partial-image SSE. This plugin does not expose a credit/quota hook.
+**Magpie limits:** arbitrary plugin subscriptions are currently absent from its automatic image-provider picker; explicit provider/model requests work. Its dedicated Images endpoints return completed JSON rather than partial-image SSE.
 
 ## Verification
 
@@ -77,9 +95,9 @@ Aside exposes no size, quality, background, output-format, or mask controls in t
 bun test
 ```
 
-107 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, OAuth origin/state/token/expiry boundaries, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
+163 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, OAuth origin/state/token/expiry boundaries, allowance plan transitions and monetary rounding, cross-account billing races, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
 
-Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and both Google CLI sign-in modes, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, and lazy forced renewal. Paste-URL sign-in completed with the callback port occupied and no loopback callback request. Aside's icon was observed in Magpie's light and dark plugin lists. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, device acceptance, and token refresh were not exercised against a live Aside account.**
+Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and both Google CLI sign-in modes, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, lazy forced renewal, and allowance CLI/UI reads. Usage → Overview was checked in light and dark themes with both Used and Left controls; an exhausted monthly meter with add-on credits still passed `magpie quota wait`. Paste-URL sign-in completed with the callback port occupied and no loopback callback request. Aside's icon was observed in Magpie's light and dark plugin lists. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, allowance reads, device acceptance, and token refresh were not exercised against a live Aside account.**
 
 ## Source provenance
 

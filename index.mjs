@@ -3,6 +3,7 @@ import { createApi, AsideApiError } from "./src/api.mjs"
 import { createAccountManager, expired } from "./src/accounts.mjs"
 import { createCredentialIdentity, createDeviceRegistration } from "./src/device.mjs"
 import { createAuthMethods } from "./src/auth.mjs"
+import { readAsideUsage } from "./src/usage.mjs"
 import { createCatalog, catalogModels, accountModels, protocolFor, isImageModel } from "./src/catalog.mjs"
 import { handleImageRequest } from "./src/images.mjs"
 import { accountSessionId, prepareModelRequest, modelHeaders, errorResponse } from "./src/wire.mjs"
@@ -131,6 +132,11 @@ export const MagpieAsidePlugin = async ({ client }, options = {}) => {
       provider: "aside",
       icon: "https://aside.com/icon.png",
       methods,
+      usage: async (getAuth) => {
+        const auth = await getAuth()
+        if (auth?.type !== "oauth") return {}
+        return readAsideUsage(accounts.session(getAuth))
+      },
       // Deliberately no auth.refresh: the host's lead/loader renewal is not Aside's lazy check.
       loader: async (getAuth) => {
         const auth = await getAuth()

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 — 2026-10-21
+
+- Add account-scoped usage and allowance reporting from Aside's authenticated billing subscription endpoint.
+- Show current plan, renewal/reset dates, authoritative usage percentage, balances, monthly allowance, and separate add-on credits.
+- Preserve exact credit rounding and reject stale cross-account reads.
+- Keep allowance meters informational so monthly exhaustion does not block add-on spending.
+- Document stock Magpie's provider-placement and inline OAuth callback limitations.
+
 ## 0.1.1 — 2026-10-21
 
 - Add Google OAuth paste-callback-URL sign-in for remote or hosted Magpie, without a loopback listener.
