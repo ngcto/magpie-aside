@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — 2026-10-21
+
+- Remove the third Google paste-callback sign-in method and its parser, tests, and current instructions.
+- Keep email-code and automatic Google sign-in.
+- Use WorkBuddy-style native credit counts when the spent amount is known safely; retain authoritative percentages.
+- Hide zero add-ons, show positive add-ons inline, and avoid an inferred Monthly/Pace cycle.
+- Do not show paid renewal metadata on free plans.
+
 ## 0.1.2 — 2026-10-21
 
 - Add account-scoped usage and allowance reporting from Aside's authenticated billing subscription endpoint.

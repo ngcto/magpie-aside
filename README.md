@@ -1,6 +1,6 @@
 # magpie-aside
 
-[Magpie provider plugin](https://usemagpie.ai/docs/plugins) for Aside's language and image-generation models. Email-code and Google sign-in, including paste-URL sign-in for remote hosts; source-derived request headers; isolated credentials/devices; on-demand token renewal. No runtime dependencies beyond Magpie's Bun host.
+[Magpie provider plugin](https://usemagpie.ai/docs/plugins) for Aside's language and image-generation models. Email-code and automatic Google sign-in; source-derived request headers; isolated credentials/devices; on-demand token renewal. No runtime dependencies beyond Magpie's Bun host.
 
 ## Install
 
@@ -23,18 +23,8 @@ This checkout is loaded in place. After editing it, restart Magpie's plugin host
 
 - **Email code:** enter your email, then the six-digit verification code. Use the code, not the emailed link. No password or dummy API key is required.
 - **Google (local callback):** complete the server-issued Google/Supabase flow in your browser. Aside's hosted page calls the plugin's receiver on **`127.0.0.1:21420`**. Allow the browser's local-network permission if prompted. Quit Aside or another process occupying that port before using this method. The attempt expires after ten minutes; the listener closes after completion, failure, or expiry.
-- **Google (paste callback URL):** choose this option when Magpie runs remotely or on a hosted server. It uses no local callback listener and also expires after ten minutes.
 
-### Google on remote or hosted Magpie
-
-1. Choose **Sign in with Google (paste callback URL)**.
-2. Open browser DevTools on your own machine and enable **Network → Preserve log** before following the authorization URL.
-3. Complete Google sign-in. Copy the final Supabase redirect response's **`Location` header** pointing at Aside's `/auth/callback`, not the HTTP request URL.
-4. Paste that **complete URL** into Magpie. It must include the `accountId` and `oauthAttemptId` query parameters and the `#access_token=…` fragment.
-
-Aside's callback page immediately clears its query and fragment, so copying the address after the page loads will not work. The HTTP request URL also omits the fragment. Alternatively, disable JavaScript **only for the Aside callback origin** before signing in, keep it enabled for Google/Supabase, and copy the full callback address. If the URL is incomplete or the attempt expires, start a new sign-in.
-
-**Treat the callback URL like a password. Do not share or store it.**
+For remote or hosted Magpie, use email-code sign-in. Google requires the browser to reach Magpie's local callback receiver; there is no paste-callback sign-in method.
 
 Magpie stores each account in its `plugin-auth.json` (mode `0600` on POSIX). The saved record contains access/refresh tokens, expiry, account identity, the credential's device registration, and its last known plan. OTPs, callback URLs, Supabase callback tokens, and opaque OAuth attempt tickets are not saved.
 
@@ -65,13 +55,13 @@ magpie quota aside --json
 magpie quota refresh aside --json
 ```
 
-The gateway also exposes it at `GET /v1/magpie/quotas`. The card shows the active plan, renewal/end date, reported monthly usage percentage and credit refresh, balance, monthly allowance, and separate add-on credits. Credit counts use Aside's own USD-cent-equivalent display convention, rounded using the server's conversion scale with exact integer arithmetic.
+The gateway also exposes it at `GET /v1/magpie/quotas`. The card shows the active plan, paid renewal/end date, reported usage percentage and credit refresh. Its neutral **Credits** window follows the [community WorkBuddy meter](https://github.com/magpie-community/plugins/blob/main/packages/workbuddy/index.mjs): native used/allowance counts and percentage, with the Used/Left controls. No cycle duration is guessed from a “Monthly” label, so the card does not invent a Pace estimate.
 
-Returned wallets are not summed, and rounded percentages are not converted into a fabricated spent count. The meter is informational: a monthly allowance reaching 100% does not disable the account or prevent add-on spending; Aside still admits or rejects each generation request.
+When the add-on wallet is explicitly empty, the remaining balance is within the grant, and numeric precision is safe, the spent count is computed from the raw grant minus balance in Aside's display-credit units, rounded to hundredths. The backend's percentage remains authoritative. Unknown wallet composition or oversized numeric values use exact balance/allowance text instead; positive add-ons appear inline, and zero add-ons are hidden. Wallets are never summed. The meter remains informational: a credit allowance reaching 100% does not disable the account or prevent add-on spending; Aside still admits or rejects each generation request.
 
 Allowance reads use the existing demand-driven token renewal and keep each credential isolated. Billing failures remain errors rather than an invented zero-use allowance. No background refresh timer or billing-plan write is added.
 
-**Stock Magpie limits:** Aside remains under **From plugins**, not the host's hardcoded Subscriptions list. The existing automatic and paste-URL Google methods remain separate; the host's native inline callback fallback cannot pass Aside's HTTPS token fragment to a plugin. No Magpie host patch is applied.
+**Stock Magpie limits:** Aside remains under **From plugins**, not the host's hardcoded Subscriptions list. Google uses the automatic local callback only; the host's native inline callback fallback cannot pass Aside's HTTPS token fragment to a plugin. No Magpie host patch is applied.
 
 
 ## Images
@@ -95,9 +85,9 @@ Aside exposes no size, quality, background, output-format, or mask controls in t
 bun test
 ```
 
-163 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, OAuth origin/state/token/expiry boundaries, allowance plan transitions and monetary rounding, cross-account billing races, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
+157 regression tests cover credential/refresh races, read-only model discovery, new catalog IDs, local OAuth callback boundaries, allowance plan transitions and monetary rounding, safe spent/limit presentation, cross-account billing races, MIME/size limits, cancellation, structured output, Fast-mode recovery, and timeout lifetimes.
 
-Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and both Google CLI sign-in modes, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, lazy forced renewal, and allowance CLI/UI reads. Usage → Overview was checked in light and dark themes with both Used and Left controls; an exhausted monthly meter with add-on credits still passed `magpie quota wait`. Paste-URL sign-in completed with the callback port occupied and no loopback callback request. Aside's icon was observed in Magpie's light and dark plugin lists. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, allowance reads, device acceptance, and token refresh were not exercised against a live Aside account.**
+Also exercised with real **Magpie 0.1.1307** and a strict local protocol emulator: email and automatic Google CLI sign-in, native and translated LLM JSON/SSE, tool history, image generation and multipart editing, lazy forced renewal, and allowance CLI/UI reads. The sign-in chooser was observed with only email and Google buttons. Usage → Overview was checked in light and dark themes: the fixture's empty add-on wallet rendered `36 / 500 credits · 7% used` and `464 / 500 credits · 93% left`, without Pace, a zero add-on balance, or paid renewal metadata on its free plan. An exhausted credit meter with add-on credits still passed `magpie quota wait`. Aside's icon was observed in Magpie's plugin lists in the earlier icon check. The live public catalog and default Google OAuth-start endpoint were observed separately. **Authenticated cloud generation, allowance reads, device acceptance, and token refresh were not exercised against a live Aside account.**
 
 ## Source provenance
 

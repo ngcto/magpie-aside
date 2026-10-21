@@ -1,6 +1,6 @@
 {
   "name": "magpie-aside",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Aside provider for Magpie: email and Google sign-in, language models, and image generation",
   "type": "module",
   "main": "./index.mjs",

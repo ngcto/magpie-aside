@@ -112,6 +112,50 @@ describe("Aside account allowance", () => {
     expect(time(usage.until)).toBe(Date.parse(PERIOD_END))
   })
 
+  test("a free single-wallet allowance exposes real used and limit counts without paid renewal metadata", async () => {
+    const { account } = fixture({ value: billing({
+      subscription: subscription({ plan: { slug: "free", name: "Free", tier: 0 }, currentPeriodEnd: "2026-10-01T00:00:00Z" }),
+      credit: { add_on_balance_micros: "0", balance_micros: "4640000", monthly_grant_micros: "5000000", used_percent: 7 },
+    }) })
+    const usage = await readAsideUsage(account)
+    expect(usage.plan).toBe("Free")
+    expect(usage.renew).toBeUndefined()
+    expect(usage.until).toBeUndefined()
+    expect(usage.balance).toBeUndefined()
+    expect(usage.windows[0]).toMatchObject({ amount: 36, limit: 500, unit: "credits", used: 7, aside: true })
+    expect(time(usage.windows[0].resetsAt)).toBe(Date.parse(CREDIT_REFRESH))
+  })
+
+  test("single-wallet counts retain hundredth-credit rounding rather than subtracting rounded balances", async () => {
+    for (const [spentMicros, amount] of [[49, 0], [50, 0.01], [363660, 36.37]]) {
+      const { account } = fixture({ value: billing({ credit: {
+        add_on_balance_micros: "0", monthly_grant_micros: "5000000",
+        balance_micros: String(5000000 - spentMicros), used_percent: 7,
+      } }) })
+      const usage = await readAsideUsage(account)
+      expect(usage.windows[0].amount).toBe(amount)
+      expect(usage.windows[0].limit).toBe(500)
+      expect(usage.windows[0].used).toBe(7)
+    }
+  })
+
+  test("unknown, oversized, zero-grant and excess-balance wallets do not become fabricated spent counts", async () => {
+    for (const [credit, reported] of [
+      [{ add_on_balance_micros: undefined }, [4000n, 10000n]],
+      [{ add_on_balance_micros: "0", balance_micros: "110000000" }, [11000n, 10000n]],
+      [{ add_on_balance_micros: "0", monthly_grant_micros: "0", balance_micros: "0" }, [0n, 0n]],
+      [{ add_on_balance_micros: "0", monthly_grant_micros: "90071992547409935000", balance_micros: "0" }, [0n, 9007199254740994n]],
+    ]) {
+      const { account } = fixture({ value: billing({ credit }) })
+      const usage = await readAsideUsage(account)
+      expect(usage.windows[0].amount).toBeUndefined()
+      expect(usage.windows[0].limit).toBeUndefined()
+      expect(usage.windows[0].used).toBe(60)
+      expect(counts(usage.windows[0].display)).toEqual(reported)
+      expect(usage.balance).toBeUndefined()
+    }
+  })
+
   test("used percentage is authoritative even when wallet, grant and remaining percentage cannot reproduce it", async () => {
     const { account } = fixture({ value: billing({ credit: {
       used_percent: 42, remaining_percent: 61, balance_micros: "125000000",
@@ -120,8 +164,8 @@ describe("Aside account allowance", () => {
     const usage = await readAsideUsage(account)
     const window = usage.windows[0]
     expect(window.used).toBe(42)
-    expect(counts(window.display)).toEqual([12500n, 15000n])
-    expect(counts(usage.balance)).toEqual([9000n])
+    expect(counts(window.display)).toEqual([12500n, 15000n, 9000n])
+    expect(usage.balance).toBeUndefined()
     // A lone numeric limit makes Magpie show a fabricated zero spent amount.
     expect(Object.hasOwn(window, "amount")).toBe(false)
     expect(Object.hasOwn(window, "limit")).toBe(false)
@@ -133,8 +177,8 @@ describe("Aside account allowance", () => {
       const usage = await readAsideUsage(account)
       expect(usage.windows[0].used).toBe(used)
       expect(usage.windows[0].aside).toBe(true)
-      expect(counts(usage.balance)).toEqual([500n])
-      expect(counts(usage.windows[0].display)).toEqual([4000n, 10000n])
+      expect(usage.balance).toBeUndefined()
+      expect(counts(usage.windows[0].display)).toEqual([4000n, 10000n, 500n])
     })
   }
 
@@ -144,8 +188,8 @@ describe("Aside account allowance", () => {
       add_on_balance_micros: "10000",
     } }) })
     const usage = await readAsideUsage(account)
-    expect(counts(usage.windows[0].display)).toEqual([25n, 1000n])
-    expect(counts(usage.balance)).toEqual([50n])
+    expect(counts(usage.windows[0].display)).toEqual([25n, 1000n, 50n])
+    expect(usage.balance).toBeUndefined()
   })
 
   for (const [raw, scale, expected] of [
@@ -164,8 +208,8 @@ describe("Aside account allowance", () => {
         add_on_balance_micros: raw,
       } }) })
       const usage = await readAsideUsage(account)
-      expect(counts(usage.windows[0].display)).toEqual([expected, expected])
-      expect(counts(usage.balance)).toEqual([expected])
+      expect(counts(usage.windows[0].display)).toEqual(expected > 0n ? [expected, expected, expected] : [expected, expected])
+      expect(usage.balance).toBeUndefined()
       expect(usage.windows[0].used).toBe(60)
     })
   }
@@ -200,7 +244,7 @@ describe("Aside account allowance", () => {
     expect(usage.until).toBeUndefined()
     expect(usage.windows[0].resetsAt).toBeUndefined()
     expect(usage.windows[0].used).toBe(60)
-    expect(counts(usage.windows[0].display)).toEqual([4000n, 10000n])
+    expect(counts(usage.windows[0].display)).toEqual([4000n, 10000n, 500n])
   })
 
   for (const [label, mutate] of [

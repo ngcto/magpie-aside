@@ -3,6 +3,7 @@ import { AsideApiError } from "./api.mjs"
 const PLAN_SLUGS = new Set(["free", "pro", "max"])
 const CREDIT_FORMAT = new Intl.NumberFormat("en-US")
 const CENTS_PER_USD = 100n
+const MAX_NUMERIC_CREDIT_HUNDREDTHS = BigInt(Number.MAX_SAFE_INTEGER) / 100n
 
 function object(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -31,6 +32,11 @@ function creditText(value, microsPerUsd) {
   return `${CREDIT_FORMAT.format(credits)} ${credits === 1n ? "credit" : "credits"}`
 }
 
+function numericCredits(value, microsPerUsd) {
+  const hundredths = (value * CENTS_PER_USD * 100n + microsPerUsd / 2n) / microsPerUsd
+  return hundredths <= MAX_NUMERIC_CREDIT_HUNDREDTHS ? Number(hundredths) / 100 : undefined
+}
+
 function mapBilling(billing, user) {
   if (!object(billing) || !object(billing.credit) ||
       (billing.subscription !== null && !object(billing.subscription))) invalidUsage()
@@ -51,27 +57,35 @@ function mapBilling(billing, user) {
   // syncCachedSubscriptionPlanFromBilling treats active and trialing as live;
   // canceled, past-due and all other inactive subscriptions have the free plan.
   const active = subscription && (subscription.status === "active" || subscription.status === "trialing")
-  const until = active && subscription.currentPeriodEnd !== null ? timestamp(subscription.currentPeriodEnd) : undefined
+  const paid = active && subscription.plan.slug !== "free"
+  const until = paid && subscription.currentPeriodEnd !== null ? timestamp(subscription.currentPeriodEnd) : undefined
+  // With an explicitly empty add-on wallet, the grant minus its remaining
+  // balance is a known spent count. Other wallet combinations stay separate.
+  const limit = addOn === 0n ? numericCredits(grant, scale) : undefined
+  const amount = limit > 0 && balance <= grant ? numericCredits(grant - balance, scale) : undefined
+  const counted = amount !== undefined && limit > 0
 
   return {
     plan: active ? subscription.plan.name || subscription.plan.slug : "Free",
     ...(typeof user === "string" && user.trim() ? { user } : {}),
-    ...(active ? { renew: subscription.cancelAtPeriodEnd ? "off" : "auto" } : {}),
+    ...(paid ? { renew: subscription.cancelAtPeriodEnd ? "off" : "auto" } : {}),
     ...(until !== undefined ? { until } : {}),
-    ...(addOn !== undefined ? { balance: `Add-on: ${creditText(addOn, scale)}` } : {}),
     windows: [{
-      name: "Monthly",
+      name: "Credits",
       used: credit.used_percent,
       // Billing does not establish when all spendable wallets are exhausted.
       // Preserve request admission by Aside; this meter is informational.
       aside: true,
       ...(resetsAt !== undefined ? { resetsAt } : {}),
-      // The native quota uses used_percent and refresh_at. The billing UI shows
-      // the grant and add-on separately, but does not establish whether balance
-      // includes add-ons or how much of the monthly grant was spent. Show the
-      // reported values without inventing a spent count or summing wallets.
-      // Magpie displays 0 / limit when a numeric limit lacks an amount.
-      display: `${creditText(balance, scale)} balance · ${creditText(grant, scale)} monthly allowance`,
+      ...(counted ? {
+        amount, limit, unit: "credits",
+        display: `${CREDIT_FORMAT.format(amount)} / ${CREDIT_FORMAT.format(limit)}`,
+      } : {
+        // Unknown wallet composition or unsafe numeric precision must not
+        // become a fabricated zero spent amount or lose an add-on balance.
+        display: `${creditText(balance, scale)} balance · ${creditText(grant, scale)} allowance` +
+          (addOn > 0n && (addOn * CENTS_PER_USD + scale / 2n) / scale > 0n ? ` · ${creditText(addOn, scale)} add-on` : ""),
+      }),
     }],
   }
 }
