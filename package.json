@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./index.mjs",
   "exports": { ".": "./index.mjs" },
-  "files": ["index.mjs", "src", "README.md", "CHANGELOG.md", "LICENSE"],
+  "files": ["index.mjs", "src", "CHANGELOG.md", "LICENSE"],
   "keywords": ["opencode", "opencode-plugin", "magpie", "aside", "auth", "provider"],
   "license": "MIT",
   "magpie": { "icon": "https://aside.com/icon.png" },
