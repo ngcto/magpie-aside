@@ -150,6 +150,14 @@ export function protocolFor(model) {
   return "openai-completions"
 }
 
+// GPT reasoning requests reject sampling controls. The catalog's off variant
+// establishes whether explicit none/off requests can retain them; it does not
+// declare the server's default effort, so omitted effort stays conservative.
+export function supportsSampling(model, effort) {
+  return !model.reasoning || !/^gpt-/i.test(model.id) ||
+    (model.availableThinkingLevels?.includes("off") && (effort === "none" || effort === "off"))
+}
+
 export function isImageModel(catalog, id) {
   return catalog?.imageModels?.some((model) => model.id === id) ?? false
 }
@@ -205,7 +213,7 @@ function normalizedModels(provider, models, images, allowFast) {
         cost: price(),
         limit: { context: model.contextWindow, output: model.maxTokens },
         capabilities: {
-          temperature: true,
+          temperature: supportsSampling(model, "off"),
           reasoning: model.reasoning,
           attachment: true,
           toolcall: true,

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import os from "node:os"
 import { AsideApiError } from "./api.mjs"
+import { supportsSampling } from "./catalog.mjs"
 
 const THINKING_BUDGETS = { minimal: 1024, low: 2048, medium: 8192, high: 16384, xhigh: 16384, max: 16384 }
 
@@ -105,6 +106,20 @@ export function prepareModelRequest(body, model, protocol, auth, incomingHeaders
     delete body.service_tier
     if (fastMode) body.speed = "fast"
     return { path: "/ai/v1/messages?beta=true", body, sessionId, title, fastMode }
+  }
+
+  const effort = protocol === "openai-responses" ? body.reasoning?.effort : body.reasoning_effort
+  if (!supportsSampling(model, effort)) {
+    delete body.temperature
+    delete body.top_p
+    delete body.top_logprobs
+    if (protocol === "openai-responses") {
+      if (Array.isArray(body.include) && body.include.includes("message.output_text.logprobs")) {
+        body.include = body.include.filter((value) => value !== "message.output_text.logprobs")
+      }
+    } else {
+      delete body.logprobs
+    }
   }
 
   const messages = protocol === "openai-responses" ? body.input : body.messages

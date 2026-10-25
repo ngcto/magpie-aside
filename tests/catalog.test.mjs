@@ -239,3 +239,20 @@ test("free/pro/max and unknown plans have distinct entitlements without claiming
   expect(pro.free).not.toBe(true)
 })
 
+test("temperature availability distinguishes GPT reasoning-only models from sampling-capable models", async () => {
+  const f = fixture(() => Response.json(payload([
+    model({ id: "gpt-reasoning-only", api: "openai-responses", availableThinkingLevels: ["low", "high"] }),
+    model({ id: "gpt-switchable", api: "openai-responses" }),
+    model({ id: "grok-reasoning-only", api: "openai-responses", availableThinkingLevels: ["low", "high"] }),
+    model({ id: "gemini-reasoning-only", availableThinkingLevels: ["low", "high"] }),
+    model({ id: "gpt-chat", reasoning: false }),
+  ])))
+  const { catalog } = await f.catalog.get()
+  for (const models of [catalogModels(catalog, provider), accountModels(catalog, provider, auth("free"))]) {
+    expect(models["gpt-reasoning-only"].capabilities.temperature).toBe(false)
+    for (const id of ["gpt-switchable", "grok-reasoning-only", "gemini-reasoning-only", "gpt-chat"]) {
+      expect(models[id].capabilities.temperature).toBe(true)
+    }
+  }
+})
+

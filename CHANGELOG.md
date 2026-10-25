@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Avoid GPT reasoning-request 400s by removing incompatible temperature, top-p, and log-probability controls before dispatch; retain structured output and unrelated response includes.
+- Preserve sampling and log probabilities for explicit none/off requests when the live GPT catalog supports disabled reasoning, and leave other model families' sampling controls unchanged.
+- Stop advertising temperature for GPT models whose catalog has no disabled-reasoning variant. Omitted GPT effort is treated conservatively because the catalog does not declare the server default.
+
 ## 0.1.4 — 2026-10-21
 
 - Declare native hosted search so GPT/Grok Responses requests retain web/X search tools instead of being rewritten as generic search.
