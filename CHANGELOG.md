@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 — 2026-10-25
 
 - Avoid GPT reasoning-request 400s by removing incompatible temperature, top-p, and log-probability controls before dispatch; retain structured output and unrelated response includes.
 - Preserve sampling and log probabilities for explicit none/off requests when the live GPT catalog supports disabled reasoning, and leave other model families' sampling controls unchanged.
