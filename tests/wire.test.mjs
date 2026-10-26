@@ -14,6 +14,33 @@ test("adapting thinking retains the caller's independent structured-output requi
   expect(body.output_config).toEqual({ format })
 })
 
+test("Aside Messages omits rejected server-side context editing without editing conversation history", () => {
+  const messages = [
+    { role: "assistant", content: [
+      { type: "thinking", thinking: "Use the lookup tool", signature: "thinking-signature" },
+      { type: "tool_use", id: "call-1", name: "lookup", input: { query: "test" } },
+    ] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "call-1", content: "lookup result" }] },
+  ]
+  const original = structuredClone(messages)
+  const contextManagement = { edits: [{ type: "clear_thinking_20251015", keep: "all" },
+    { type: "clear_tool_uses_20250919", trigger: { type: "input_tokens", value: 10000 }, keep: { type: "tool_uses", value: 3 } }] }
+  for (const thinking of [undefined, { type: "disabled" }, { type: "enabled", budget_tokens: 2048 }, { type: "adaptive" }]) {
+    const body = { model: model.id, messages: structuredClone(messages), max_tokens: 32000,
+      thinking, context_management: contextManagement }
+    prepareModelRequest(body, model, "anthropic-messages", auth, session)
+    expect(body).not.toHaveProperty("context_management")
+    expect(body.messages).toEqual(original)
+  }
+})
+
+test("Responses retains its independent context-management configuration", () => {
+  const contextManagement = [{ type: "compaction", compact_threshold: 10000 }]
+  const body = { model: model.id, input: "Hello", context_management: contextManagement }
+  prepareModelRequest(body, model, "openai-responses", auth, session)
+  expect(body.context_management).toEqual(contextManagement)
+})
+
 test("a Chat authentication replay retains Fast intent after native body preparation removes its tier", () => {
   const body = { model: model.id, messages: [{ role: "user", content: "Hello" }], service_tier: "priority" }
   const requestedFast = body.service_tier === "priority"

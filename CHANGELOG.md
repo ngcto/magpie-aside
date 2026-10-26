@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 — 2026-10-26
+
+- Omit `context_management` on Aside's Messages endpoint, which rejects Claude Code's server-side context-editing directives with a 400. Preserve the supplied conversation history, thinking, structured output, caching, and tools; client-side context management remains the caller's responsibility.
+- Leave Responses context-management settings and unrelated upstream validation errors unchanged.
+
 ## 0.1.5 — 2026-10-25
 
 - Avoid GPT reasoning-request 400s by removing incompatible temperature, top-p, and log-probability controls before dispatch; retain structured output and unrelated response includes.

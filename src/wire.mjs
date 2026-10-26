@@ -84,6 +84,8 @@ export function prepareModelRequest(body, model, protocol, auth, incomingHeaders
 
   if (protocol === "anthropic-messages") {
     delete body.betas
+    // Aside rejects server-side context editing; keep the supplied transcript intact.
+    delete body.context_management
     if (body.thinking?.type === "adaptive") {
       const budget = THINKING_BUDGETS[body.output_config?.effort] ?? THINKING_BUDGETS.high
       const max = body.max_tokens ?? model.maxTokens
