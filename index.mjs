@@ -20,7 +20,7 @@ async function requestBody(input, init) {
   try { return JSON.parse(body) } catch { throw new AsideApiError(400, "The request body is not valid JSON.") }
 }
 
-export const MagpieAsidePlugin = async ({ client, magpie }, options = {}) => {
+export const MagpieAsidePlugin = async ({ client }, options = {}) => {
   const api = createApi({ baseURL: options?.apiBaseUrl ?? process.env.ASIDE_API_URL ?? "https://api.aside.com" })
   const accounts = createAccountManager({ api, client })
   const catalog = createCatalog({ api })
@@ -103,21 +103,6 @@ export const MagpieAsidePlugin = async ({ client, magpie }, options = {}) => {
         if (!path || !url.pathname.endsWith(path.split("?")[0].replace("/ai/v1", ""))) {
           throw new AsideApiError(400, `This Aside model uses ${protocol}; route it through its declared model API.`)
         }
-        if (protocol === "openai-responses" && /^(?:gpt|grok)-/i.test(model.id) &&
-            (body.tool_choice == null || body.tool_choice === "auto") &&
-            (body.tools == null || Array.isArray(body.tools)) &&
-            (body.tool_choice === "auto" || body.tools?.length)) {
-          if (magpie?.option?.("aside", "web_search") === true &&
-              !body.tools?.some((tool) => typeof tool?.type === "string" && tool.type.startsWith("web_search"))) {
-            body.tools ??= []
-            body.tools.push({ type: "web_search" })
-          }
-          if (/^grok-/i.test(model.id) && magpie?.option?.("aside", "x_search") === true &&
-              !body.tools?.some((tool) => tool?.type === "x_search")) {
-            body.tools ??= []
-            body.tools.push({ type: "x_search" })
-          }
-        }
         const incoming = new Headers(init.headers ?? (input instanceof Request ? input.headers : undefined))
         if (!incoming.has("x-aside-session-id")) incoming.set("x-aside-session-id", randomUUID())
         const requestedFast = body.speed === "fast" || body.service_tier === "priority"
@@ -148,16 +133,6 @@ export const MagpieAsidePlugin = async ({ client, magpie }, options = {}) => {
       provider: "aside",
       icon: "https://aside.com/icon.png",
       methods,
-      options: [
-        {
-          key: "web_search", label: "Native web search", default: false,
-          description: "Offer hosted web search to GPT/Grok Responses models during automatic tool use. May consume additional Aside allowance.",
-        },
-        {
-          key: "x_search", label: "Native X search", default: false,
-          description: "Offer hosted X search to Grok Responses models during automatic tool use. May consume additional Aside allowance.",
-        },
-      ],
       usage: async (getAuth) => {
         const auth = await getAuth()
         if (auth?.type !== "oauth") return {}

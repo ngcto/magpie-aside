@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.7 — 2026-10-27
+
+- Remove automatic hosted web-search injection for GPT/Grok and both Native web search / Native X search plugin options.
+- Keep Grok native X search available without plugin configuration: retain hosted-tool capability and caller-declared tools/filters, but never inject search tools or override tool restrictions.
+
 ## 0.1.6 — 2026-10-26
 
 - Omit `context_management` on Aside's Messages endpoint, which rejects Claude Code's server-side context-editing directives with a 400. Preserve the supplied conversation history, thinking, structured output, caching, and tools; client-side context management remains the caller's responsibility.
