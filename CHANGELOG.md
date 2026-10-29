@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8 — 2026-10-29
+
+- Default to `https://api.asidehq.com`. `api.aside.com` now returns Cloudflare error 1034, so every sign-in start failed with `Aside API request failed.`
+- Keep the legacy `api.aside.com` origin trusted for callback validation. `ASIDE_API_URL` and `apiBaseUrl` still override the default.
+
 ## 0.1.7 — 2026-10-27
 
 - Remove automatic hosted web-search injection for GPT/Grok and both Native web search / Native X search plugin options.

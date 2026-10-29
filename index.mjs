@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { createApi, AsideApiError } from "./src/api.mjs"
+import { createApi, AsideApiError, DEFAULT_BASE_URL } from "./src/api.mjs"
 import { createAccountManager, expired } from "./src/accounts.mjs"
 import { createCredentialIdentity, createDeviceRegistration } from "./src/device.mjs"
 import { createAuthMethods } from "./src/auth.mjs"
@@ -21,7 +21,7 @@ async function requestBody(input, init) {
 }
 
 export const MagpieAsidePlugin = async ({ client }, options = {}) => {
-  const api = createApi({ baseURL: options?.apiBaseUrl ?? process.env.ASIDE_API_URL ?? "https://api.aside.com" })
+  const api = createApi({ baseURL: options?.apiBaseUrl ?? process.env.ASIDE_API_URL ?? DEFAULT_BASE_URL })
   const accounts = createAccountManager({ api, client })
   const catalog = createCatalog({ api })
   const baseURL = `${api.baseURL}/ai/v1`
