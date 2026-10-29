@@ -58,7 +58,7 @@ There are no configured build, lint, formatter, or standalone run commands. Afte
 
 Use Bun for tests and local probes; Magpie runs the plugin in its Bun host. Tests require `bun:test` and `Bun.serve`; production also uses Node built-ins and modern Fetch/Abort/WebCrypto APIs. No dependencies, lockfile, package-manager pin, or minimum runtime version is declared. Source is packaged directly without transpilation.
 
-API origin precedence is `options.apiBaseUrl` → `ASIDE_API_URL` → Aside's default API. Use a loopback origin for isolated QA. Base URLs cannot contain credentials/query/fragment, and requests cannot leave their configured origin or follow redirects.
+API origin precedence is `options.apiBaseUrl` → `ASIDE_API_URL` → Aside's default API (`https://api.asidehq.com`). Use a loopback origin for isolated QA. Base URLs cannot contain credentials/query/fragment, and requests cannot leave their configured origin or follow redirects.
 
 Grok native X search is available without plugin configuration: clients enable it by explicitly declaring an `x_search` tool in a Responses request. It may consume Aside allowance. The plugin does not inject hosted web/X search tools or expose search switches.
 

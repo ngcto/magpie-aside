@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "https://api.aside.com"
+export const DEFAULT_BASE_URL = "https://api.asidehq.com"
 const RETRY_STATUSES = new Set([408, 429])
 
 export class AsideApiError extends Error {

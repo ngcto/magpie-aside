@@ -1,9 +1,9 @@
-import { AsideApiError, responseJSON } from "./api.mjs"
+import { AsideApiError, DEFAULT_BASE_URL, responseJSON } from "./api.mjs"
 
 const CACHE_MS = 43_200_000
 const FAILURE_COOLDOWN_MS = 60_000
 const TIMEOUT_MS = 5_000
-const DEFAULT_API_URL = "https://api.aside.com/ai/v1"
+const DEFAULT_API_URL = `${DEFAULT_BASE_URL}/ai/v1`
 const PLAN_TIER = Object.freeze({ free: 0, pro: 1, max: 2 })
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"])
 const THINKING_BUDGETS = Object.freeze({ minimal: 1024, low: 2048, medium: 8192, high: 16384, xhigh: 16384, max: 16384 })

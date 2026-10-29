@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { createServer } from "node:http"
-import { AsideApiError } from "./api.mjs"
+import { AsideApiError, DEFAULT_BASE_URL } from "./api.mjs"
 import { createCredentialIdentity } from "./device.mjs"
 
 export const GOOGLE_CALLBACK_HOST = "127.0.0.1"
@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MAX_CALLBACK_BODY_BYTES = 65536
 const CALLBACK_SOCKET_TIMEOUT_MS = 10000
-const ASIDE_ORIGINS = new Set(["https://api.aside.com", "https://api.asidehq.com"])
+const ASIDE_ORIGINS = new Set([DEFAULT_BASE_URL, "https://api.aside.com"])
 const CONFLICT_CODES = new Set([
   "ASIDE_PROFILE_ALREADY_BOUND_TO_DIFFERENT_ACCOUNT",
   "ASIDE_LOCAL_ACCOUNT_ALREADY_SIGNED_IN",
